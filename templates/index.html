@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SEGA Games Web Scraper</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:       #04070d;
+      --card:     #090f1c;
+      --panel:    #0c1423;
+      --border:   #16213a;
+      --blue:     #1565e8;
+      --blue-lo:  rgba(21,101,232,.14);
+      --blue-glow:rgba(21,101,232,.45);
+      --yellow:   #ffd700;
+      --red:      #e8001a;
+      --green:    #00e676;
+      --text:     #dde3f5;
+      --muted:    #5e6e96;
+      --radius:   10px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden}
+
+    /* scanline */
+    body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+      background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.055) 3px,rgba(0,0,0,.055) 4px)}
+
+    /* ═══ HEADER ════════════════════════════════════ */
+    header{
+      background:linear-gradient(160deg,#000 0%,#050e22 55%,#000 100%);
+      border-bottom:2px solid var(--yellow);
+      padding:1.4rem 2rem 1.5rem;
+      position:relative;overflow:hidden;
+    }
+    header::before{content:'';position:absolute;inset:0;pointer-events:none;
+      background:radial-gradient(ellipse 90% 70% at 50% -10%,rgba(21,101,232,.13),transparent)}
+    /* animated rings */
+    .h-ring{position:absolute;border-radius:50%;border:1.5px solid var(--yellow);opacity:.07;pointer-events:none;animation:ring-pulse 3.5s ease-in-out infinite}
+    .h-ring:nth-child(1){width:320px;height:320px;top:-120px;right:-60px}
+    .h-ring:nth-child(2){width:200px;height:200px;top:-60px;right:60px;animation-delay:.8s}
+    .h-ring:nth-child(3){width:100px;height:100px;bottom:-20px;left:8%;animation-delay:1.5s}
+    @keyframes ring-pulse{0%,100%{transform:scale(1);opacity:.07}50%{transform:scale(1.06);opacity:.14}}
+
+    .header-inner{max-width:1300px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;position:relative;z-index:2}
+    .logo{font-family:'Press Start 2P',monospace;font-size:clamp(1.1rem,3vw,1.9rem);color:var(--yellow);
+      text-shadow:0 0 18px var(--yellow),4px 4px 0 var(--red);letter-spacing:3px;
+      animation:flicker 6s ease-in-out infinite}
+    @keyframes flicker{0%,100%{opacity:1}91%{opacity:1}92%{opacity:.55}93%{opacity:1}96%{opacity:.75}97%{opacity:1}}
+    .logo-sub{font-family:'Orbitron',sans-serif;font-size:.58rem;letter-spacing:4px;color:var(--muted);text-transform:uppercase;margin-top:.3rem}
+
+    .header-stats{display:flex;gap:1rem;flex-wrap:wrap;align-items:center}
+    .stat-chip{display:flex;flex-direction:column;align-items:center;background:var(--blue-lo);
+      border:1px solid rgba(21,101,232,.28);border-radius:8px;padding:.4rem .9rem}
+    .sc-num{font-family:'Orbitron',sans-serif;font-size:1.15rem;font-weight:900;color:var(--yellow)}
+    .sc-lbl{font-size:.62rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+
+    /* ═══ SCRAPE PANEL ══════════════════════════════ */
+    .scrape-panel{background:var(--panel);border-bottom:1px solid var(--border);padding:1.3rem 2rem}
+    .sp-inner{max-width:1300px;margin:0 auto}
+    .sp-title{font-family:'Orbitron',sans-serif;font-size:.7rem;font-weight:700;
+      letter-spacing:3px;text-transform:uppercase;color:var(--yellow);margin-bottom:.9rem;
+      display:flex;align-items:center;gap:.6rem}
+    .sp-title::before{content:'⚡'}
+
+    .url-form{display:flex;gap:.7rem;flex-wrap:wrap;align-items:stretch}
+    .url-input-wrap{flex:1;min-width:260px;display:flex;border:1.5px solid var(--border);
+      border-radius:var(--radius);overflow:hidden;background:var(--bg);
+      transition:border-color .2s,box-shadow .2s}
+    .url-input-wrap:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-glow)}
+    .url-prefix{padding:.7rem .9rem;color:var(--muted);font-size:.85rem;font-weight:700;
+      background:rgba(255,255,255,.03);border-right:1px solid var(--border);
+      display:flex;align-items:center;white-space:nowrap}
+    #url-input{flex:1;background:transparent;border:none;outline:none;padding:.7rem .9rem;
+      color:var(--text);font-family:'Rajdhani',sans-serif;font-size:1rem;font-weight:600}
+    #url-input::placeholder{color:var(--muted)}
+
+    .num-wrap{display:flex;align-items:center;gap:.5rem;background:var(--bg);
+      border:1.5px solid var(--border);border-radius:var(--radius);padding:.5rem .9rem}
+    .num-wrap label{font-size:.72rem;color:var(--muted);font-weight:700;letter-spacing:1px;
+      text-transform:uppercase;white-space:nowrap}
+    #max-games{background:transparent;border:none;outline:none;color:var(--yellow);
+      font-family:'Orbitron',sans-serif;font-size:.9rem;font-weight:700;width:44px;text-align:center}
+    #max-games::-webkit-inner-spin-button{opacity:1}
+
+    .btn-scrape{background:var(--yellow);color:#000;border:none;border-radius:var(--radius);
+      cursor:pointer;padding:.7rem 1.5rem;font-family:'Press Start 2P',monospace;font-size:.55rem;
+      letter-spacing:1px;white-space:nowrap;transition:all .2s;
+      box-shadow:0 0 0 0 rgba(255,215,0,0)}
+    .btn-scrape:hover{background:#ffe03a;box-shadow:0 0 20px rgba(255,215,0,.4)}
+    .btn-scrape:active{transform:scale(.96)}
+    .btn-scrape:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+    .sp-hint{margin-top:.7rem;font-size:.8rem;color:var(--muted);font-weight:600}
+    .sp-hint a{color:var(--blue);text-decoration:none}
+    .sp-hint a:hover{text-decoration:underline}
+
+    /* progress */
+    .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:.8rem;display:none}
+    .progress-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--yellow));animation:prog 1.8s ease-in-out infinite}
+    @keyframes prog{0%{width:0%;margin-left:0}60%{width:80%;margin-left:0}100%{width:0%;margin-left:100%}}
+
+    /* ═══ TOOLBAR ═══════════════════════════════════ */
+    .toolbar{background:var(--card);border-bottom:1px solid var(--border);
+      padding:.9rem 2rem;position:sticky;top:0;z-index:100}
+    .tb-inner{max-width:1300px;margin:0 auto;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap}
+
+    .search-wrap{flex:1;min-width:200px;display:flex;border:1.5px solid var(--border);
+      border-radius:var(--radius);overflow:hidden;background:var(--bg);
+      transition:border-color .2s,box-shadow .2s}
+    .search-wrap:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-glow)}
+    .search-icon{padding:0 .8rem;color:var(--muted);display:flex;align-items:center;font-size:1rem}
+    #search-input{flex:1;background:transparent;border:none;outline:none;padding:.62rem .5rem;
+      color:var(--text);font-family:'Rajdhani',sans-serif;font-size:.98rem;font-weight:600}
+    #search-input::placeholder{color:var(--muted)}
+
+    select.filter-sel{background:var(--bg);color:var(--text);border:1.5px solid var(--border);
+      border-radius:var(--radius);padding:.62rem .9rem;font-family:'Rajdhani',sans-serif;
+      font-size:.95rem;font-weight:600;outline:none;cursor:pointer}
+    select.filter-sel:focus{border-color:var(--blue)}
+
+    .view-toggle{display:flex;gap:.3rem}
+    .vt-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:6px;
+      padding:.45rem .65rem;cursor:pointer;color:var(--muted);font-size:1rem;transition:all .2s}
+    .vt-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+
+    .btn-exp{background:transparent;color:var(--text);border:1.5px solid var(--border);
+      border-radius:var(--radius);padding:.62rem .9rem;cursor:pointer;
+      font-family:'Rajdhani',sans-serif;font-size:.88rem;font-weight:700;
+      transition:border-color .2s,color .2s;white-space:nowrap}
+    .btn-exp:hover{border-color:var(--blue);color:var(--blue)}
+
+    /* status */
+    .status-row{max-width:1300px;margin:0 auto;padding:.5rem 2rem;
+      display:flex;align-items:center;gap:.6rem;font-size:.82rem;color:var(--muted);font-weight:600}
+    .sdot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+    .sdot.ok{background:var(--green);box-shadow:0 0 7px var(--green);animation:blink 1.6s ease-in-out infinite}
+    .sdot.busy{background:var(--yellow);box-shadow:0 0 7px var(--yellow);animation:blink .7s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+
+    /* ═══ MAIN ══════════════════════════════════════ */
+    main{max-width:1300px;margin:0 auto;padding:1.4rem 2rem 3rem}
+
+    /* empty */
+    .empty{text-align:center;padding:5rem 2rem;display:flex;flex-direction:column;align-items:center;gap:1rem}
+    .empty-icon{font-size:4rem;opacity:.3}
+    .empty h2{font-family:'Orbitron',sans-serif;font-size:1rem;color:var(--muted)}
+    .empty p{color:var(--muted);font-size:.95rem;max-width:380px;line-height:1.65}
+
+    /* ── CARD GRID ── */
+    .games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(295px,1fr));gap:1.3rem}
+    .game-card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+      overflow:hidden;cursor:pointer;animation:cardIn .3s ease both;
+      transition:transform .25s,box-shadow .25s,border-color .25s}
+    .game-card:hover{transform:translateY(-5px);border-color:var(--blue);
+      box-shadow:0 16px 36px rgba(0,0,0,.5),0 0 20px var(--blue-glow)}
+    @keyframes cardIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+    .c-img{width:100%;height:150px;background:linear-gradient(135deg,#080e1c,#0c1830);
+      display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .c-img img{width:100%;height:100%;object-fit:contain;padding:6px;transition:transform .4s}
+    .game-card:hover .c-img img{transform:scale(1.06)}
+    .c-img .no-img{font-size:3rem;opacity:.25}
+
+    .c-body{padding:.9rem 1rem 1rem}
+    .c-title{font-family:'Orbitron',sans-serif;font-size:.82rem;font-weight:700;color:#fff;
+      margin-bottom:.6rem;line-height:1.3;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .c-rows{display:flex;flex-direction:column;gap:.32rem}
+    .c-row{display:flex;gap:.45rem;font-size:.8rem}
+    .c-lbl{color:var(--muted);font-weight:700;font-size:.67rem;text-transform:uppercase;
+      letter-spacing:.5px;min-width:68px;flex-shrink:0;padding-top:.05rem}
+    .c-val{color:var(--text);font-weight:600;line-height:1.35;
+      display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .c-foot{display:flex;align-items:center;justify-content:space-between;
+      margin-top:.8rem;padding-top:.7rem;border-top:1px solid var(--border)}
+    .c-id{font-family:'Orbitron',sans-serif;font-size:.6rem;color:var(--muted);font-weight:700}
+    .c-link{display:inline-flex;align-items:center;gap:.35rem;background:var(--blue);color:#fff;
+      font-family:'Orbitron',sans-serif;font-size:.55rem;font-weight:700;
+      letter-spacing:1.5px;text-transform:uppercase;padding:.4rem .8rem;
+      border-radius:5px;text-decoration:none;transition:all .2s;
+      box-shadow:0 0 10px var(--blue-glow)}
+    .c-link:hover{background:#2278f0;box-shadow:0 0 18px var(--blue-glow)}
+    .c-link .arr{animation:arr .3s ease-in-out infinite alternate}
+    @keyframes arr{from{transform:translateX(0)}to{transform:translateX(2px)}}
+
+    /* ── TABLE ── */
+    .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px}
+    table.gtbl{width:100%;border-collapse:collapse;font-size:.86rem}
+    table.gtbl thead tr{background:var(--panel);border-bottom:2px solid var(--blue)}
+    table.gtbl th{padding:.8rem 1rem;text-align:left;font-family:'Orbitron',sans-serif;
+      font-size:.62rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+      color:var(--muted);white-space:nowrap}
+    table.gtbl td{padding:.72rem 1rem;border-bottom:1px solid var(--border);
+      vertical-align:top;line-height:1.4;font-weight:600;color:var(--text)}
+    table.gtbl tr:last-child td{border-bottom:none}
+    table.gtbl tr:hover td{background:rgba(21,101,232,.06);cursor:pointer}
+    .td-title{font-family:'Orbitron',sans-serif;font-size:.78rem;font-weight:700;color:#fff;min-width:140px}
+    .td-feat{max-width:240px;color:var(--muted);font-size:.78rem;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .tbl-link{color:var(--blue);text-decoration:none;font-weight:700;font-size:.78rem;white-space:nowrap}
+    .tbl-link:hover{text-decoration:underline}
+
+    /* ═══ MODAL ═════════════════════════════════════ */
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:500;
+      align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(6px)}
+    .overlay.open{display:flex}
+    .modal{background:var(--card);border:2px solid var(--blue);border-radius:16px;
+      max-width:660px;width:100%;max-height:88vh;overflow-y:auto;
+      box-shadow:0 0 60px var(--blue-glow);animation:mIn .25s ease;
+      scrollbar-width:thin;scrollbar-color:var(--blue) var(--card)}
+    @keyframes mIn{from{transform:scale(.9) translateY(16px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+
+    .m-imgbox{width:100%;height:190px;background:linear-gradient(135deg,#080e1c,#0c1830);
+      border-radius:14px 14px 0 0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .m-imgbox img{width:100%;height:100%;object-fit:contain;padding:8px}
+    .m-imgbox .m-noimg{font-size:4.5rem;opacity:.22}
+
+    .m-body{padding:1.5rem}
+    .m-close{float:right;background:var(--border);border:none;color:var(--text);
+      width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:.9rem;
+      display:flex;align-items:center;justify-content:center;transition:background .2s;margin-top:-.1rem}
+    .m-close:hover{background:var(--red)}
+    .m-title{font-family:'Orbitron',sans-serif;font-size:1.25rem;font-weight:900;
+      color:#fff;margin:.3rem 0 1.1rem;line-height:1.25;clear:right}
+
+    .m-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:1rem}
+    .m-item{display:flex;flex-direction:column;gap:.12rem}
+    .m-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700}
+    .m-val{font-size:.92rem;font-weight:600;color:var(--text);line-height:1.4}
+
+    .m-feat{background:rgba(21,101,232,.07);border:1px solid rgba(21,101,232,.22);
+      border-radius:8px;padding:.9rem;margin-bottom:1rem}
+    .m-feat .mf-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:1.5px;
+      color:var(--blue);font-weight:700;margin-bottom:.45rem}
+    .m-feat .mf-txt{font-size:.88rem;color:var(--muted);line-height:1.65}
+
+    .m-linkbox{display:flex;align-items:center;justify-content:space-between;gap:1rem;
+      background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.2);
+      border-radius:8px;padding:.85rem 1rem;flex-wrap:wrap}
+    .mlb-info{display:flex;flex-direction:column;gap:.12rem}
+    .mlb-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700}
+    .mlb-desc{font-size:.86rem;color:var(--text);font-weight:600}
+    .m-linkbtn{display:inline-flex;align-items:center;gap:.45rem;
+      background:linear-gradient(135deg,var(--blue),#0a3d8a);color:#fff;
+      font-family:'Orbitron',sans-serif;font-size:.58rem;font-weight:700;
+      letter-spacing:2px;text-transform:uppercase;padding:.6rem 1.2rem;
+      border-radius:6px;border:1px solid var(--blue);text-decoration:none;
+      white-space:nowrap;transition:all .2s;box-shadow:0 0 12px var(--blue-glow)}
+    .m-linkbtn:hover{background:linear-gradient(135deg,#2278f0,#1155bb);transform:translateY(-2px)}
+    .m-linkbtn .la{animation:arr .35s ease-in-out infinite alternate;display:inline-block}
+
+    /* ═══ FOOTER ════════════════════════════════════ */
+    footer{border-top:1px solid var(--border);text-align:center;
+      padding:1.6rem 2rem;font-size:.8rem;color:var(--muted);font-weight:600;letter-spacing:.8px}
+    footer .fy{color:var(--yellow)}
+    footer a{color:var(--blue);text-decoration:none}
+    footer a:hover{text-decoration:underline}
+
+    /* ═══ RESPONSIVE ════════════════════════════════ */
+    @media(max-width:680px){
+      .m-grid{grid-template-columns:1fr}
+      .tb-inner{flex-direction:column;align-items:stretch}
+      .url-form{flex-direction:column}
+      .games-grid{grid-template-columns:1fr}
+      .header-stats{display:none}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════════════ -->
+<header>
+  <div class="h-ring"></div>
+  <div class="h-ring"></div>
+  <div class="h-ring"></div>
+  <div class="header-inner">
+    <div>
+      <div class="logo">SEGA</div>
+      <div class="logo-sub">Games Web Scraper &amp; Archive</div>
+    </div>
+    <div class="header-stats">
+      <div class="stat-chip">
+        <div class="sc-num" id="hdr-total">0</div>
+        <div class="sc-lbl">Games Scraped</div>
+      </div>
+      <div class="stat-chip">
+        <div class="sc-num" id="hdr-time" style="font-size:.7rem">—</div>
+        <div class="sc-lbl">Last Scraped</div>
+      </div>
+      <div class="stat-chip">
+        <div class="sc-num" style="font-size:.7rem">SQLite</div>
+        <div class="sc-lbl">Storage</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ SCRAPE PANEL ══════════════════════════════════════ -->
+<div class="scrape-panel">
+  <div class="sp-inner">
+    <div class="sp-title">Scraping Module — Enter Target URL</div>
+    <div class="url-form">
+      <div class="url-input-wrap">
+        <span class="url-prefix">🌐 URL</span>
+        <input id="url-input" type="url"
+          placeholder="https://en.wikipedia.org/wiki/Sonic_the_Hedgehog_(series)"
+          value="https://en.wikipedia.org/wiki/Sonic_the_Hedgehog_(series)"/>
+      </div>
+      <div class="num-wrap">
+        <label for="max-games">MAX</label>
+        <input id="max-games" type="number" min="10" max="30" value="15"/>
+      </div>
+      <button class="btn-scrape" id="scrape-btn" onclick="runScrape()">⚡ SCRAPE</button>
+    </div>
+    <div class="sp-hint">
+      ✅ Working URLs you can use:
+      <a href="https://en.wikipedia.org/wiki/Category:Sega_games" target="_blank">Category:Sega_games</a> &nbsp;·&nbsp;
+      <a href="https://en.wikipedia.org/wiki/Sonic_the_Hedgehog_(series)" target="_blank">Sonic series</a> &nbsp;·&nbsp;
+      <a href="https://en.wikipedia.org/wiki/List_of_Sega_arcade_games" target="_blank">List of Sega arcade games</a>
+      &nbsp;·&nbsp; Minimum 10 games &nbsp;·&nbsp; No login-protected pages
+    </div>
+    <div class="progress-bar" id="prog-bar"><div class="progress-fill"></div></div>
+  </div>
+</div>
+
+<!-- ═══ TOOLBAR ══════════════════════════════════════════ -->
+<div class="toolbar">
+  <div class="tb-inner">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input id="search-input" type="text" placeholder="Search title, developer, publisher, platform…"/>
+    </div>
+    <select class="filter-sel" id="filter-platform">
+      <option value="">All Platforms</option>
+      <option value="genesis">Genesis / Mega Drive</option>
+      <option value="saturn">Saturn</option>
+      <option value="dreamcast">Dreamcast</option>
+      <option value="arcade">Arcade</option>
+      <option value="master">Master System</option>
+      <option value="game gear">Game Gear</option>
+    </select>
+    <div class="view-toggle">
+      <button class="vt-btn active" id="btn-cards" title="Card view" onclick="setView('cards')">▦</button>
+      <button class="vt-btn" id="btn-table" title="Table view" onclick="setView('table')">☰</button>
+    </div>
+    <button class="btn-exp" onclick="location.href='/api/export/csv'">⬇ CSV</button>
+    <button class="btn-exp" onclick="location.href='/api/export/json'">⬇ JSON</button>
+  </div>
+</div>
+
+<!-- STATUS -->
+<div class="status-row">
+  <div class="sdot" id="sdot"></div>
+  <span id="status-txt">Loading saved data…</span>
+</div>
+
+<!-- ═══ MAIN ══════════════════════════════════════════════ -->
+<main>
+  <!-- Empty state -->
+  <div class="empty" id="empty-state">
+    <div class="empty-icon">🎮</div>
+    <h2>No Games Scraped Yet</h2>
+    <p>Enter a URL above and click <strong>⚡ SCRAPE</strong> to fetch live SEGA game data. At least 10 games will be scraped and stored in SQLite.</p>
+  </div>
+
+  <!-- Card grid -->
+  <div class="games-grid" id="games-grid" style="display:none"></div>
+
+  <!-- Table -->
+  <div class="tbl-wrap" id="tbl-wrap" style="display:none">
+    <table class="gtbl">
+      <thead>
+        <tr>
+          <th>#</th><th>Title</th><th>Release Date</th>
+          <th>Developer</th><th>Publisher</th><th>Platforms</th>
+          <th>Key Features</th><th>Link</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-body"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- ═══ MODAL ═════════════════════════════════════════════ -->
+<div class="overlay" id="overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="m-imgbox" id="m-imgbox">
+      <img id="m-img" src="" alt=""
+        onerror="this.style.display='none';document.getElementById('m-noimg').style.display='block'"/>
+      <div id="m-noimg" style="display:none" class="m-noimg">🎮</div>
+    </div>
+    <div class="m-body">
+      <button class="m-close" onclick="closeModalDirect()">✕</button>
+      <div class="m-title" id="m-title"></div>
+      <div class="m-grid">
+        <div class="m-item"><div class="m-lbl">📅 Release Date</div><div class="m-val" id="m-rel"></div></div>
+        <div class="m-item"><div class="m-lbl">🏢 Developer</div><div class="m-val" id="m-dev"></div></div>
+        <div class="m-item"><div class="m-lbl">📦 Publisher</div><div class="m-val" id="m-pub"></div></div>
+        <div class="m-item"><div class="m-lbl">🕹️ Platforms</div><div class="m-val" id="m-plat"></div></div>
+      </div>
+      <div class="m-feat">
+        <div class="mf-lbl">✨ Key Features</div>
+        <div class="mf-txt" id="m-feat"></div>
+      </div>
+      <div class="m-linkbox">
+        <div class="mlb-info">
+          <div class="mlb-lbl">🔗 Game Link</div>
+          <div class="mlb-desc">View full info on Wikipedia</div>
+        </div>
+        <a id="m-link" class="m-linkbtn" href="#" target="_blank" rel="noopener">
+          Visit Page <span class="la">→</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════ -->
+<footer>
+  <span class="fy">SEGA</span> Games Web Scraper &nbsp;|&nbsp;
+  Python · Flask · BeautifulSoup · SQLite &nbsp;|&nbsp;
+  Source: <a href="https://en.wikipedia.org/wiki/List_of_Sega_games" target="_blank">Wikipedia</a>
+  &nbsp;|&nbsp; Academic Project &copy; 2025
+</footer>
+
+<!-- ═══ SCRIPT ════════════════════════════════════════════ -->
+<script>
+  let allGames = [];
+  let curView  = 'cards';
+
+  // ── status helpers ──────────────────────────────────────
+  function setStatus(msg, state = '') {
+    document.getElementById('status-txt').textContent = msg;
+    const d = document.getElementById('sdot');
+    d.className = 'sdot' + (state ? ' ' + state : '');
+  }
+  function showProg(v) {
+    document.getElementById('prog-bar').style.display = v ? 'block' : 'none';
+  }
+
+  // ── load header stats ───────────────────────────────────
+  async function loadStatus() {
+    try {
+      const d = await (await fetch('/api/status')).json();
+      document.getElementById('hdr-total').textContent = d.total_games || 0;
+      document.getElementById('hdr-time').textContent  = d.last_scraped ? d.last_scraped.slice(0,16) : '—';
+    } catch {}
+  }
+
+  // ── initial load from DB ────────────────────────────────
+  async function loadGames() {
+    setStatus('Loading saved data…');
+    try {
+      const data = await (await fetch('/api/games')).json();
+      allGames   = data;
+      if (allGames.length) {
+        renderView(allGames);
+        setStatus(`${allGames.length} games loaded from database.`, 'ok');
+      } else {
+        setStatus('No data yet. Enter a URL and click ⚡ SCRAPE.', '');
+      }
+    } catch { setStatus('Could not connect to server.'); }
+    loadStatus();
+  }
+
+  // ── scrape ──────────────────────────────────────────────
+  async function runScrape() {
+    const url  = document.getElementById('url-input').value.trim();
+    const max  = parseInt(document.getElementById('max-games').value) || 15;
+    const btn  = document.getElementById('scrape-btn');
+
+    if (!url) { alert('Please enter a URL.'); return; }
+    if (!url.startsWith('http')) { alert('URL must start with http or https.'); return; }
+
+    btn.disabled = true; btn.textContent = '⏳ SCRAPING…';
+    setStatus('Scraping live data — please wait…', 'busy');
+    showProg(true);
+
+    try {
+      const res  = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, max_games: Math.max(max, 10) })
+      });
+      const data = await res.json();
+      if (data.error) {
+        setStatus('Error: ' + data.error, '');
+        alert('Scrape failed: ' + data.error);
+      } else {
+        allGames = data.games;
+        renderView(allGames);
+        setStatus(`✅ ${data.scraped} games scraped and saved to SQLite!`, 'ok');
+        document.getElementById('hdr-total').textContent = data.scraped;
+        document.getElementById('hdr-time').textContent  = new Date().toLocaleString().slice(0,16);
+      }
+    } catch (e) {
+      setStatus('Error: ' + e.message, '');
+      alert('Connection error: ' + e.message);
+    }
+
+    showProg(false);
+    btn.disabled = false; btn.textContent = '⚡ SCRAPE';
+  }
+
+  // ── search ──────────────────────────────────────────────
+  document.getElementById('search-input').addEventListener('input', debounce(async function() {
+    const q = this.value.trim();
+    const p = document.getElementById('filter-platform').value;
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (p) params.set('platform', p);
+    try {
+      const data = await (await fetch('/api/games?' + params)).json();
+      renderView(data);
+      setStatus(`${data.length} result(s)`, data.length ? 'ok' : '');
+    } catch {}
+  }, 280));
+
+  // ── platform filter ─────────────────────────────────────
+  document.getElementById('filter-platform').addEventListener('change', async function() {
+    const q = document.getElementById('search-input').value.trim();
+    const p = this.value;
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (p) params.set('platform', p);
+    try {
+      const data = await (await fetch('/api/games?' + params)).json();
+      renderView(data);
+      setStatus(`${data.length} result(s)`, data.length ? 'ok' : '');
+    } catch {}
+  });
+
+  // ── view toggle ─────────────────────────────────────────
+  function setView(v) {
+    curView = v;
+    document.getElementById('btn-cards').classList.toggle('active', v === 'cards');
+    document.getElementById('btn-table').classList.toggle('active', v === 'table');
+    renderView(allGames);
+  }
+
+  // ── render ──────────────────────────────────────────────
+  function renderView(games) {
+    const empty = document.getElementById('empty-state');
+    const grid  = document.getElementById('games-grid');
+    const tbl   = document.getElementById('tbl-wrap');
+    empty.style.display = games.length ? 'none' : 'flex';
+    grid.style.display  = (games.length && curView === 'cards') ? 'grid'  : 'none';
+    tbl.style.display   = (games.length && curView === 'table') ? 'block' : 'none';
+    if (curView === 'cards') renderCards(games);
+    else                     renderTable(games);
+  }
+
+  function renderCards(games) {
+    document.getElementById('games-grid').innerHTML = games.map((g, i) => `
+      <div class="game-card" style="animation-delay:${i*.04}s" onclick="openModal(${g.id})">
+        <div class="c-img">
+          ${g.image_url
+            ? `<img src="${g.image_url}" alt="${esc(g.title)}"
+                onerror="this.style.display='none';this.nextSibling.style.display='block'"/>
+               <span class="no-img" style="display:none">🎮</span>`
+            : `<span class="no-img">🎮</span>`}
+        </div>
+        <div class="c-body">
+          <div class="c-title">${esc(g.title)}</div>
+          <div class="c-rows">
+            <div class="c-row"><span class="c-lbl">Released</span><span class="c-val">${esc(g.release_date)}</span></div>
+            <div class="c-row"><span class="c-lbl">Developer</span><span class="c-val">${esc(g.developer)}</span></div>
+            <div class="c-row"><span class="c-lbl">Publisher</span><span class="c-val">${esc(g.publisher)}</span></div>
+            <div class="c-row"><span class="c-lbl">Platforms</span><span class="c-val">${esc(g.platforms)}</span></div>
+          </div>
+          <div class="c-foot">
+            <span class="c-id">#${String(g.id).padStart(3,'0')}</span>
+            ${g.wiki_url
+              ? `<a class="c-link" href="${esc(g.wiki_url)}" target="_blank" rel="noopener"
+                  onclick="event.stopPropagation()">🔗 Game Link <span class="arr">→</span></a>`
+              : `<span style="color:var(--muted);font-size:.72rem">No link</span>`}
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  function renderTable(games) {
+    document.getElementById('tbl-body').innerHTML = games.map(g => `
+      <tr onclick="openModal(${g.id})">
+        <td style="color:var(--muted);font-weight:700">${g.id}</td>
+        <td class="td-title">${esc(g.title)}</td>
+        <td>${esc(g.release_date)}</td>
+        <td>${esc(g.developer)}</td>
+        <td>${esc(g.publisher)}</td>
+        <td>${esc(g.platforms)}</td>
+        <td class="td-feat">${esc(g.key_features)}</td>
+        <td>${g.wiki_url
+          ? `<a class="tbl-link" href="${esc(g.wiki_url)}" target="_blank" rel="noopener"
+              onclick="event.stopPropagation()">🔗 Link</a>`
+          : '—'}</td>
+      </tr>`).join('');
+  }
+
+  // ── modal ───────────────────────────────────────────────
+  function openModal(id) {
+    const g = allGames.find(x => x.id === id);
+    if (!g) return;
+    const img   = document.getElementById('m-img');
+    const noImg = document.getElementById('m-noimg');
+    if (g.image_url) { img.src = g.image_url; img.style.display='block'; noImg.style.display='none'; }
+    else             { img.style.display='none'; noImg.style.display='block'; }
+    document.getElementById('m-title').textContent = g.title;
+    document.getElementById('m-rel').textContent   = g.release_date;
+    document.getElementById('m-dev').textContent   = g.developer;
+    document.getElementById('m-pub').textContent   = g.publisher;
+    document.getElementById('m-plat').textContent  = g.platforms;
+    document.getElementById('m-feat').textContent  = g.key_features;
+    const lnk = document.getElementById('m-link');
+    lnk.href = g.wiki_url || '#';
+    lnk.style.pointerEvents = g.wiki_url ? 'auto' : 'none';
+    lnk.style.opacity       = g.wiki_url ? '1'    : '.4';
+    document.getElementById('overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModalDirect() {
+    document.getElementById('overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function closeModal(e) { if (e.target.id === 'overlay') closeModalDirect(); }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
+
+  // ── utils ───────────────────────────────────────────────
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function debounce(fn, ms) {
+    let t; return function(...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this,a), ms); };
+  }
+
+  // ── init ────────────────────────────────────────────────
+  loadGames();
+</script>
+</body>
+</html>
